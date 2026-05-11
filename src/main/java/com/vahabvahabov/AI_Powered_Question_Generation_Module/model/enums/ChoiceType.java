@@ -1,6 +1,5 @@
 package com.vahabvahabov.AI_Powered_Question_Generation_Module.model.enums;
 
-import com.azure.core.annotation.Get;
 import lombok.Getter;
 
 @Getter

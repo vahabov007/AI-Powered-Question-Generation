@@ -4,6 +4,7 @@ import com.fasterxml.jackson.annotation.JsonInclude;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+import org.springframework.http.HttpStatusCode;
 
 import java.time.Instant;
 import java.util.Map;
@@ -12,7 +13,7 @@ import java.util.Map;
 @AllArgsConstructor
 @NoArgsConstructor
 @JsonInclude(JsonInclude.Include.NON_NULL)
-public class ApiResponse<T> {
+public class ApiResponse<T>  {
 
     private boolean success;
     private String message;
@@ -44,6 +45,16 @@ public class ApiResponse<T> {
     public static <T> ApiResponse<T> error(String message, int status, String path) {
         ApiResponse<T> response = new ApiResponse<>();
         response.setSuccess(false);
+        response.setMessage(message);
+        response.setStatus(status);
+        response.setPath(path);
+        return response;
+    }
+
+    public static <T> ApiResponse<T> error(String message, T errors, int status, String path) {
+        ApiResponse<T> response = new ApiResponse<>();
+        response.setSuccess(false);
+        response.setData(errors);
         response.setMessage(message);
         response.setStatus(status);
         response.setPath(path);
