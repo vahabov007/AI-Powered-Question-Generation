@@ -31,6 +31,7 @@ public class CorsConfig {
                 "Access-Control-Request-Method",
                 "Access-Control-Request-Headers"
         ));
+        // for front-end
         config.setExposedHeaders(Arrays.asList(
                 "Authorization",
                 "Content-Type",

@@ -16,11 +16,12 @@ public class HuggingFaceConfig {
     @Bean
     public WebClient huggingFaceWebClient(WebClient.Builder builder) {
         return builder
-                .baseUrl(baseUrl)
-                .defaultHeader("Authorization", "Bearer " + apiKey)
+                .baseUrl(baseUrl + "/")
+                .defaultHeader("Authorization", "Bearer " + apiKey.trim())
+                // Coder-Decoder
                 .codecs(configurer -> configurer
                         .defaultCodecs()
-                        .maxInMemorySize(16 * 1024 * 1024))
+                        .maxInMemorySize(16 * 1024 * 1024)) // 16MB
                 .build();
     }
 }

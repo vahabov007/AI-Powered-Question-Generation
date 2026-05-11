@@ -139,14 +139,11 @@ public class GlobalExceptionHandler {
             errors.put(fieldName, errorMessage);
         });
 
-        ApiResponse<?> response = ApiResponse.error(
-                "Validation failed",
-                "VALIDATION_ERROR",
-                HttpStatus.BAD_REQUEST.value(),
-                request.getRequestURI(),
-                errors
-        );
-
+        ApiResponse<?> response = ApiResponse.error("Validation failed",
+                                                   "VALIDATION_ERROR",
+                                                             HttpStatus.BAD_REQUEST.value(),
+                                                             request.getRequestURI(),
+                                                             errors);
         log.warn("Validation errors: {}", errors);
         return new ResponseEntity<>(response, HttpStatus.BAD_REQUEST);
     }

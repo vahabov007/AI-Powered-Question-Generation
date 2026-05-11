@@ -2,12 +2,11 @@ package com.vahabvahabov.AI_Powered_Question_Generation_Module.security;
 
 import io.jsonwebtoken.*;
 import io.jsonwebtoken.security.Keys;
-import io.jsonwebtoken.security.SignatureException;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.security.core.userdetails.UserDetails;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.GrantedAuthority;
 import org.springframework.stereotype.Component;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import javax.crypto.SecretKey;
 import java.nio.charset.StandardCharsets;
@@ -15,11 +14,10 @@ import java.util.Date;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.function.Function;
+import java.util.stream.Collectors;
 
-@Component
-public class JwtUtil {
-
-    private static final Logger logger = LoggerFactory.getLogger(JwtUtil.class);
+@Component @Slf4j
+public class JwtTokenProvider {
 
     @Value("${jwt.secret}")
     private String secret;
@@ -37,9 +35,20 @@ public class JwtUtil {
         return Keys.hmacShaKeyFor(safeSecret.getBytes(StandardCharsets.UTF_8));
     }
 
-    public String generateToken(String username) {
-        Map<String, Object> claims = new HashMap<>();
-        return createToken(claims, username);
+    public String generateToken(Authentication authentication) {
+        String username = authentication.getName();
+        String authorities = authentication.getAuthorities().stream()
+                .map(GrantedAuthority::getAuthority)
+                .collect(Collectors.joining(","));
+        Date now = new Date();
+        Date expiry = new Date(now.getTime() + expirationTime);
+        return Jwts.builder()
+                .subject(username)
+                .claim("roles", authorities)
+                .issuedAt(now)
+                .expiration(expiry)
+                .signWith(getSigningKey(), Jwts.SIG.HS512)
+                .compact();
     }
 
     private String createToken(Map<String, Object> claims, String subject) {
@@ -56,7 +65,7 @@ public class JwtUtil {
     }
 
     private Claims extractAllClaims(String token) throws JwtException {
-        return Jwts.parserBuilder()
+        return Jwts.parser()
                 .setSigningKey(getSigningKey())
                 .build()
                 .parseClaimsJws(token)
@@ -74,7 +83,7 @@ public class JwtUtil {
         } catch (ExpiredJwtException e) {
             return e.getClaims().getExpiration();
         } catch (JwtException e) {
-            logger.error("Error extracting expiration from token", e);
+            log.error("Error extracting expiration from token", e);
             throw e;
         }
     }
@@ -86,7 +95,7 @@ public class JwtUtil {
         } catch (ExpiredJwtException e) {
             return true;
         } catch (JwtException e) {
-            logger.error("Error checking token expiration", e);
+            log.error("Error checking token expiration", e);
             return true;
         }
     }
@@ -97,46 +106,41 @@ public class JwtUtil {
         } catch (ExpiredJwtException e) {
             return e.getClaims().getSubject();
         } catch (JwtException e) {
-            logger.error("Error extracting username from token", e);
+            log.error("Error extracting username from token", e);
             throw e;
         }
     }
 
-    public Boolean validateToken(String token, UserDetails userDetails) {
+    public String generateTokenFromUsername(String username, String roles) {
+        Date now = new Date();
+        Date expiry = new Date(now.getTime() + expirationTime);
+
+        return Jwts.builder()
+                .subject(username)
+                .claim("roles", roles)
+                .issuedAt(now)
+                .expiration(expiry)
+                .signWith(getSigningKey(), Jwts.SIG.HS512)
+                .compact();
+    }
+
+    public boolean validateToken(String token) {
         try {
-            final String username = extractUsername(token);
-            if (isTokenExpired(token)) {
-                logger.warn("Token expired for user: {}", username);
-                return false;
-            }
-
-            boolean usernameMatches = username.equals(userDetails.getUsername());
-
-            if (!usernameMatches) {
-                logger.warn("Token username mismatch. Token: {}, UserDetails: {}", username, userDetails.getUsername());
-            }
-            extractAllClaims(token);
-
-            return usernameMatches;
+            Jwts.parser()
+                    .verifyWith(getSigningKey())
+                    .build()
+                    .parseSignedClaims(token);
+            return true;
         } catch (ExpiredJwtException e) {
-            logger.warn("Token expired for user: {}", e.getClaims().getSubject());
-            return false;
-        } catch (SignatureException e) {
-            logger.error("Invalid JWT signature", e);
-            return false;
+            log.error("JWT token is expired: {}", e.getMessage());
         } catch (MalformedJwtException e) {
-            logger.error("Invalid JWT token", e);
-            return false;
-        } catch (UnsupportedJwtException e) {
-            logger.error("Unsupported JWT token", e);
-            return false;
+            log.error("Invalid JWT token: {}", e.getMessage());
+        } catch (SignatureException e) {
+            log.error("Invalid JWT signature: {}", e.getMessage());
         } catch (IllegalArgumentException e) {
-            logger.error("JWT claims string is empty", e);
-            return false;
-        } catch (Exception e) {
-            logger.error("Error validating token", e);
-            return false;
+            log.error("JWT claims string is empty: {}", e.getMessage());
         }
+        return false; // Return false instead of crashing the thread
     }
 
     public Date getExpirationTime(String token) {
@@ -148,7 +152,7 @@ public class JwtUtil {
             final Claims claims = extractAllClaims(token);
             return createToken(claims, claims.getSubject());
         } catch (JwtException e) {
-            logger.error("Cannot refresh token", e);
+            log.error("Cannot refresh token", e);
             throw e;
         }
     }

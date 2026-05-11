@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.redis.core.RedisTemplate;
+import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
@@ -14,10 +15,10 @@ import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.time.Duration;
 import java.time.Instant;
+import java.time.LocalDateTime;
 import java.util.concurrent.TimeUnit;
 
-@Component
-@Slf4j
+@Component @Slf4j
 public class RateLimitFilter extends OncePerRequestFilter {
 
     private final RedisTemplate<String, Object> redisTemplate;
@@ -40,14 +41,19 @@ public class RateLimitFilter extends OncePerRequestFilter {
             throws ServletException, IOException {
 
         String requestURI = request.getRequestURI();
-        if (requestURI.startsWith("/api/auth/")) {
+        // Don't rate the user who tries to register
+        if (requestURI.startsWith("/api/v1/auth/")) {
             filterChain.doFilter(request, response);
             return;
         }
 
         String username = getUsernameFromRequest(request);
-        if (username == null) {
-            filterChain.doFilter(request, response);
+        if (username == null || username.startsWith("guest_")) {
+            SendErrorResponse(response,
+                       401,
+                     "Unauthorized",
+                        "Authentication required to access this resource",
+                              requestURI);
             return;
         }
 
@@ -55,7 +61,11 @@ public class RateLimitFilter extends OncePerRequestFilter {
         String windowKey = "rate_window:" + username;
 
         try {
-            Long currentWindow = (Long) redisTemplate.opsForValue().get(windowKey);
+            Object value = redisTemplate.opsForValue().get(windowKey);
+            Long currentWindow = 0L;
+            if (value instanceof Number) {
+                currentWindow = ((Number) value).longValue();
+            }
             long now = Instant.now().getEpochSecond();
             long windowSize = 60; // 1 minute in seconds
 
@@ -74,9 +84,11 @@ public class RateLimitFilter extends OncePerRequestFilter {
             }
 
             if (requestCount > burstCapacity) {
-                response.setStatus(429);
-                response.setContentType("application/json");
-                response.getWriter().write("{\"error\": \"Rate limit exceeded\", \"message\": \"Too many requests. Please try again later.\"}");
+                SendErrorResponse(response,
+                            429,
+                         "Rate Limit Exceeded",
+                            "Too many requests. Please try again later.",
+                                  requestURI);
                 log.warn("Rate limit exceeded for user: {}", username);
                 return;
             }
@@ -89,15 +101,33 @@ public class RateLimitFilter extends OncePerRequestFilter {
         }
     }
 
+    private void SendErrorResponse(HttpServletResponse response, int status, String message, String error, String requestURI) throws IOException {
+        response.setStatus(status);
+        response.setContentType(MediaType.APPLICATION_JSON_VALUE);
+        ErrorResponse errorResponse = new ErrorResponse(
+                429,
+                message,
+                error,
+                requestURI,
+                Instant.now()
+        );
+        objectMapper.writeValue(response.getOutputStream(), errorResponse);
+    }
+
     private String getUsernameFromRequest(HttpServletRequest request) {
+        String remoteAddr = "";
+        String xForwardedFor = request.getHeader("X-Forwarded-For");
+        if (xForwardedFor != null && !xForwardedFor.isEmpty()) {
+            remoteAddr = xForwardedFor.split(",")[0].trim();
+        } else {
+            remoteAddr = request.getRemoteAddr();
+        }
+
         String authHeader = request.getHeader("Authorization");
         if (authHeader != null && authHeader.startsWith("Bearer ")) {
-            try {
-                return "user_" + request.getRemoteAddr();
-            } catch (Exception e) {
-                log.debug("Could not extract username from request");
-            }
+            // In a real app, you'd extract the 'sub' (subject) from the JWT here.
+            return "user_auth_" + remoteAddr;
         }
-        return null;
+        return "guest_" + remoteAddr;
     }
 }

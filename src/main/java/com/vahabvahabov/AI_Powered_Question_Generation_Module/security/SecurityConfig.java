@@ -3,7 +3,7 @@ package com.vahabvahabov.AI_Powered_Question_Generation_Module.security;
 import com.vahabvahabov.AI_Powered_Question_Generation_Module.config.CorsConfig;
 import com.vahabvahabov.AI_Powered_Question_Generation_Module.model.User;
 import com.vahabvahabov.AI_Powered_Question_Generation_Module.repository.UserRepository;
-import org.apache.catalina.filters.RateLimitFilter;
+import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -26,33 +26,19 @@ import java.util.Optional;
 
 @Configuration
 @EnableWebSecurity
-@EnableMethodSecurity(prePostEnabled = true)
+@RequiredArgsConstructor
+//@EnableMethodSecurity(prePostEnabled = true)
 public class SecurityConfig {
 
-    @Autowired
-    private JwtRequestFilter jwtRequestFilter;
+    private final CustomAccessDeniedHandler customAccessDeniedHandler;
+    private final CustomAuthentificationEntryPoint customAuthentificationEntryPoint;
 
-    @Autowired
-    private UserRepository userRepository;
+    private final JwtRequestFilter jwtRequestFilter;
+    private final RateLimitFilter rateLimitFilter;
 
-    @Autowired
-    private CorsConfig corsConfig;
+    private final CustomUserDetailsService customUserDetailsService;
 
-    @Bean
-    public UserDetailsService userDetailsService() {
-        return username -> {
-            Optional<User> optional = userRepository.findByUsername(username);
-            if (optional.isEmpty()) {
-                throw new UsernameNotFoundException("Username not found: " + username);
-            }
-            User user = optional.get();
-            if (!user.isEnabled()) {
-                throw new UsernameNotFoundException("User account is disabled: " + username);
-            }
-
-            return user;
-        };
-    }
+    private final  CorsConfig corsConfig;
 
     @Bean
     public BCryptPasswordEncoder passwordEncoder() {
@@ -62,7 +48,7 @@ public class SecurityConfig {
     @Bean
     public DaoAuthenticationProvider authenticationProvider() {
         DaoAuthenticationProvider authProvider = new DaoAuthenticationProvider();
-        authProvider.setUserDetailsService(userDetailsService());
+        authProvider.setUserDetailsService(customUserDetailsService);
         authProvider.setPasswordEncoder(passwordEncoder());
         return authProvider;
     }
@@ -83,7 +69,8 @@ public class SecurityConfig {
                 )
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(
-                                "/api/auth/**",
+                                "/api/v1/auth/**",
+                                "/error",
                                 "/swagger-ui/**",
                                 "/v3/api-docs/**",
                                 "/swagger-ui.html",
@@ -91,25 +78,17 @@ public class SecurityConfig {
                                 "/webjars/**",
                                 "/favicon.ico"
                         ).permitAll()
-                        .requestMatchers("/api/questions/generate").hasAnyAuthority("ROLE_TEACHER", "ROLE_ADMIN")
-                        .requestMatchers("/api/questions/**/approve", "/api/questions/batch-approve").hasAuthority("ROLE_ADMIN")
-                        .requestMatchers("/api/questions", "/api/questions/my-questions").authenticated()
+                        .requestMatchers("/api/v1/questions").hasAnyAuthority("ROLE_TEACHER", "ROLE_ADMIN", "ROLE_STUDENT")
+                        .requestMatchers("/api/v1/questions/approve", "/api/v1/questions/batch-approve").hasAuthority("ROLE_ADMIN")
+                        .requestMatchers("/api/v1/questions", "/api/v1/questions/my-questions").authenticated()
                         .anyRequest().authenticated()
                 )
                 .authenticationProvider(authenticationProvider())
                 .addFilterBefore(jwtRequestFilter, UsernamePasswordAuthenticationFilter.class)
+                .addFilterBefore(rateLimitFilter, UsernamePasswordAuthenticationFilter.class)
                 .exceptionHandling(exception -> exception
-                        .authenticationEntryPoint((request, response, authException) -> {
-                            response.setStatus(401);
-                            response.setContentType("application/json");
-                            response.getWriter().write("{\"error\": \"Unauthorized\", \"message\": \"" + authException.getMessage() + "\"}");
-                        })
-                        .accessDeniedHandler((request, response, accessDeniedException) -> {
-                            response.setStatus(403);
-                            response.setContentType("application/json");
-                            response.getWriter().write("{\"error\": \"Forbidden\", \"message\": \"Insufficient permissions\"}");
-                        })
-                );
+                        .authenticationEntryPoint(customAuthentificationEntryPoint)
+                        .accessDeniedHandler(customAccessDeniedHandler));
 
         return http.build();
     }

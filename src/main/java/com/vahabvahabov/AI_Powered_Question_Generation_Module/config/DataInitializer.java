@@ -20,7 +20,7 @@ public class DataInitializer {
                 User admin = new User();
                 admin.setUsername("admin");
                 admin.setPassword(passwordEncoder.encode("admin123"));
-                admin.setRoles(Set.of(UserRole.ROLE_ADMIN, UserRole.ROLE_TEACHER));
+//                admin.setRoles(Set.of(UserRole.ROLE_ADMIN, UserRole.ROLE_TEACHER));
                 admin.setActive(true);
                 userRepository.save(admin);
 
@@ -31,7 +31,7 @@ public class DataInitializer {
                 User teacher = new User();
                 teacher.setUsername("teacher");
                 teacher.setPassword(passwordEncoder.encode("teacher123"));
-                teacher.setRoles(Set.of(UserRole.ROLE_TEACHER));
+//                teacher.setRoles(Set.of(UserRole.ROLE_TEACHER));
                 teacher.setActive(true);
                 userRepository.save(teacher);
 
