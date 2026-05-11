@@ -1,0 +1,19 @@
+services:
+  redis:
+    image: redis:7.2-alpine
+    container_name: redis_cache
+    ports:
+      - "6379:6379"
+    restart: always
+
+  app:
+    build: .
+    container_name: question_gen_app
+    ports:
+      - "8080:8080"
+    depends_on:
+      - redis
+    environment:
+      - SPRING_DATA_REDIS_HOST=redis
+      - SPRING_DATA_REDIS_PORT=6379
+      - DATABASE_URL=jdbc:postgresql://localhost:5432/postgres?currentSchema=ai_powered_question&options=-csearch_path=ai_powered_question,public
