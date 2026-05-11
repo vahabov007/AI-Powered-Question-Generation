@@ -1,0 +1,17 @@
+### Instruction:
+Act as a professional {difficulty} level instructor.
+Generate a multiple-choice question about '{topic}'.
+The question is for an automated quiz (Question #{number}).
+
+### Constraints:
+1. Provide exactly 4 options.
+2. Only one option must be correct.
+3. Return the response strictly as a JSON object.
+
+### Response Format:
+{
+  "question": "text",
+  "options": ["A", "B", "C", "D"],
+  "correctAnswer": 0,
+  "explanation": "why it's correct"
+}

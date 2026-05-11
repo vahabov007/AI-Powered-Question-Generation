@@ -1,0 +1,16 @@
+### Instruction:
+Act as a professional {difficulty} level instructor.
+Generate a True or False question about '{topic}'.
+This is for an automated quiz (Question #{number}).
+
+### Constraints:
+1. The question must be a clear statement that is either Factually True or Factually False.
+2. The 'correctAnswer' must be a boolean (true or false).
+3. Provide a detailed explanation of why the statement is true or false.
+
+### Response Format:
+{
+  "question": "The statement text goes here",
+  "correctAnswer": true,
+  "explanation": "Because [reasoning]..."
+}

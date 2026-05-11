@@ -1,0 +1,23 @@
+### Instruction:
+Act as a professional {difficulty} level instructor.
+Generate a short-answer (open-ended) question about '{topic}'.
+This is for an automated quiz (Question #{number}).
+
+### Constraints:
+1. The question should require a specific, brief answer (1-5 words).
+2. The 'correctAnswer' should be the most accurate standard answer.
+3. Provide a brief explanation of the concept for the student.
+
+### Response Format:
+{
+  "question": "What is the term for...?",
+  "correctAnswer": "The specific answer",
+  "explanation": "This is known as [concept] because..."
+}
+
+### Example Output:
+{
+  "question": "What is the capital of Azerbaijan?",
+  "correctAnswer": "Baku",
+  "explanation": "Baku is the largest city and the commercial hub of Azerbaijan."
+}
